@@ -1,0 +1,92 @@
+============================================================
+  Task-Adapted Reconstruction -- mode: joint
+  Device: cuda  |  Subset: full
+============================================================
+  Train samples : 50000
+  Val samples   : 10000
+  Test samples  : 10000
+
+============================================================
+Joint Training
+============================================================
+[info] Loading pre-trained sequential weights...
+  [Joint] Epoch 1/60  loss=0.0341  acc=98.3%  val_loss=0.0412  val_acc=98.1%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 2/60  loss=0.0202  acc=99.0%  val_loss=0.0614  val_acc=97.0%
+  [Joint] Epoch 3/60  loss=0.0179  acc=99.1%  val_loss=0.0340  val_acc=98.3%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 4/60  loss=0.0143  acc=99.3%  val_loss=0.0335  val_acc=98.5%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 5/60  loss=0.0136  acc=99.4%  val_loss=0.0325  val_acc=98.7%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 6/60  loss=0.0125  acc=99.4%  val_loss=0.0347  val_acc=98.3%
+  [Joint] Epoch 7/60  loss=0.0132  acc=99.4%  val_loss=0.0359  val_acc=98.4%
+  [Joint] Epoch 8/60  loss=0.0113  acc=99.5%  val_loss=0.0429  val_acc=97.9%
+  [Joint] Epoch 9/60  loss=0.0121  acc=99.5%  val_loss=0.0338  val_acc=98.5%
+  [Joint] Epoch 10/60  loss=0.0119  acc=99.5%  val_loss=0.0377  val_acc=98.4%
+  [Joint] Epoch 11/60  loss=0.0100  acc=99.6%  val_loss=0.0372  val_acc=98.3%
+  [Joint] Epoch 12/60  loss=0.0101  acc=99.6%  val_loss=0.0323  val_acc=98.5%
+  [Joint] Epoch 13/60  loss=0.0094  acc=99.6%  val_loss=0.0317  val_acc=98.6%
+  [Joint] Epoch 14/60  loss=0.0092  acc=99.7%  val_loss=0.0379  val_acc=98.4%
+  [Joint] Epoch 15/60  loss=0.0133  acc=99.4%  val_loss=0.0331  val_acc=98.5%
+  [Joint] Epoch 16/60  loss=0.0083  acc=99.7%  val_loss=0.0362  val_acc=98.4%
+  [Joint] Epoch 17/60  loss=0.0108  acc=99.5%  val_loss=0.0304  val_acc=98.7%
+  [Joint] Epoch 18/60  loss=0.0080  acc=99.7%  val_loss=0.0284  val_acc=98.7%
+  [Joint] Epoch 19/60  loss=0.0084  acc=99.7%  val_loss=0.0402  val_acc=98.4%
+  [Joint] Epoch 20/60  loss=0.0092  acc=99.6%  val_loss=0.0301  val_acc=98.7%
+  [Joint] Epoch 21/60  loss=0.0089  acc=99.6%  val_loss=0.0369  val_acc=98.5%
+  [Joint] Epoch 22/60  loss=0.0080  acc=99.7%  val_loss=0.0502  val_acc=97.9%
+  [Joint] Epoch 23/60  loss=0.0089  acc=99.7%  val_loss=0.0353  val_acc=98.6%
+  [Joint] Epoch 24/60  loss=0.0083  acc=99.7%  val_loss=0.0356  val_acc=98.5%
+  [Joint] Epoch 25/60  loss=0.0091  acc=99.7%  val_loss=0.0347  val_acc=98.5%
+  [Joint] Epoch 26/60  loss=0.0100  acc=99.6%  val_loss=0.0350  val_acc=98.6%
+  [Joint] Epoch 27/60  loss=0.0075  acc=99.7%  val_loss=0.0369  val_acc=98.5%
+  [Joint] Epoch 28/60  loss=0.0065  acc=99.8%  val_loss=0.0338  val_acc=98.7%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 29/60  loss=0.0054  acc=99.9%  val_loss=0.0325  val_acc=98.7%
+  [Joint] Epoch 30/60  loss=0.0062  acc=99.8%  val_loss=0.0323  val_acc=98.7%
+  [Joint] Epoch 31/60  loss=0.0076  acc=99.8%  val_loss=0.0376  val_acc=98.4%
+  [Joint] Epoch 32/60  loss=0.0095  acc=99.7%  val_loss=0.0345  val_acc=98.5%
+  [Joint] Epoch 33/60  loss=0.0071  acc=99.8%  val_loss=0.0374  val_acc=98.5%
+  [Joint] Epoch 34/60  loss=0.0082  acc=99.7%  val_loss=0.0342  val_acc=98.7%
+  [Joint] Epoch 35/60  loss=0.0065  acc=99.8%  val_loss=0.0353  val_acc=98.6%
+  [Joint] Epoch 36/60  loss=0.0087  acc=99.7%  val_loss=0.0362  val_acc=98.6%
+  [Joint] Epoch 37/60  loss=0.0075  acc=99.7%  val_loss=0.0432  val_acc=98.3%
+  [Joint] Epoch 38/60  loss=0.0064  acc=99.8%  val_loss=0.0325  val_acc=98.8%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 39/60  loss=0.0055  acc=99.9%  val_loss=0.0370  val_acc=98.5%
+  [Joint] Epoch 40/60  loss=0.0063  acc=99.8%  val_loss=0.0369  val_acc=98.5%
+  [Joint] Epoch 41/60  loss=0.0073  acc=99.8%  val_loss=0.0365  val_acc=98.4%
+  [Joint] Epoch 42/60  loss=0.0061  acc=99.8%  val_loss=0.0331  val_acc=98.8%
+  [Joint] Epoch 43/60  loss=0.0045  acc=99.9%  val_loss=0.0323  val_acc=98.7%
+  [Joint] Epoch 44/60  loss=0.0051  acc=99.9%  val_loss=0.0371  val_acc=98.6%
+  [Joint] Epoch 45/60  loss=0.0063  acc=99.8%  val_loss=0.0505  val_acc=98.0%
+  [Joint] Epoch 46/60  loss=0.0094  acc=99.6%  val_loss=0.0590  val_acc=97.5%
+  [Joint] Epoch 47/60  loss=0.0064  acc=99.8%  val_loss=0.0348  val_acc=98.7%
+  [Joint] Epoch 48/60  loss=0.0050  acc=99.9%  val_loss=0.0369  val_acc=98.5%
+  [Joint] Epoch 49/60  loss=0.0067  acc=99.8%  val_loss=0.0388  val_acc=98.4%
+  [Joint] Epoch 50/60  loss=0.0070  acc=99.8%  val_loss=0.0428  val_acc=98.5%
+  [Joint] Epoch 51/60  loss=0.0061  acc=99.8%  val_loss=0.0390  val_acc=98.5%
+  [Joint] Epoch 52/60  loss=0.0048  acc=99.9%  val_loss=0.0405  val_acc=98.5%
+  [Joint] Epoch 53/60  loss=0.0066  acc=99.8%  val_loss=0.0483  val_acc=98.1%
+  [Joint] Epoch 54/60  loss=0.0074  acc=99.7%  val_loss=0.0382  val_acc=98.6%
+  [Joint] Epoch 55/60  loss=0.0053  acc=99.9%  val_loss=0.0424  val_acc=98.5%
+  [Joint] Epoch 56/60  loss=0.0065  acc=99.8%  val_loss=0.0358  val_acc=98.8%
+[checkpoint] saved -> ./results\joint\joint_best.pt
+  [Joint] Epoch 57/60  loss=0.0041  acc=100.0%  val_loss=0.0338  val_acc=98.7%
+  [Joint] Epoch 58/60  loss=0.0039  acc=100.0%  val_loss=0.0349  val_acc=98.7%
+  [Joint] Epoch 59/60  loss=0.0065  acc=99.8%  val_loss=0.0464  val_acc=98.4%
+  [Joint] Epoch 60/60  loss=0.0078  acc=99.7%  val_loss=0.0490  val_acc=98.2%
+
+[Joint] Done.
+[plot] saved -> ./results\joint\samples.png
+
+--------------------------------------------------
+[Evaluation - joint]
+  Accuracy : 97.98%
+  MSE      : 0.008153
+  PSNR     : 20.89 dB
+--------------------------------------------------
+
+
+[OK] Done.

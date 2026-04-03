@@ -1,0 +1,490 @@
+import os
+import sys
+import random
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.autograd as autograd
+from torch.utils.data import DataLoader, random_split
+
+from models import UNet
+from dataset import MSDDataset
+from physics import (get_physics_operator, inner_loss_func,
+                     initialize_theta, parse_theta, NUM_EXPERTS,
+                     FILTER_SIZE, IN_CHANNELS, THETA_SIZE)
+
+from hoag import HOAGState, hoag_step, solve_inner_problem
+
+
+# ==========================================
+#        1. CONFIGURATION
+# ==========================================
+class Config:
+
+    DATA_ROOT = "../../data_medical/ct_data"
+    TASK = "Task09_Spleen"
+    MODALITY = "CT"
+    OUTPUT_DIR = f"./results_hoag_foe_{MODALITY}_{TASK}"
+    UPPER_BOUND_CKPT = "../../task_adapted_recon_medical/results_medical/upper_bound/upper_best.pt"
+    
+    # Dataset Splits
+    SUBSET_SIZE = None        # use full dataset
+    TRAIN_SPLIT = 0.8
+    VAL_SPLIT = 0.1
+    TEST_SPLIT = 0.1
+    
+    IMG_SIZE = 128
+    BATCH_SIZE = 64            # H100 has plenty of VRAM
+    
+    # --- SINGLE PHYSICS SETTING (SPARSE) ---
+    ACCEL = 6            # 6 for CT
+    NOISE_SIGMA = 0.5  
+    CENTER_FRAC = 0.08
+    
+    # --- INNER OPTIMIZATION SETTINGS ---
+    INNER_STEPS = 500   
+    INNER_LR = 0.1     
+    
+    # --- OUTER OPTIMIZATION SETTINGS ---
+    EPOCHS_CLEAN = 50
+    EPOCHS_HOAG = 25               
+    EPOCHS_JOINT = 25      
+    LR_UNET = 5e-3
+    LR_THETA = 1e-3
+    HYPER_GRAD_SCALE = 1e4   # scale tiny hypergradients (~1e-7) to normal range
+    
+    # --- HOAG-SPECIFIC SETTINGS ---
+    HOAG_EPSILON_TOL_INIT = 1e-3
+    HOAG_TOLERANCE_DECREASE = 'exponential'
+    HOAG_DECREASE_FACTOR = 0.9
+    HOAG_CG_MAX_ITER = 50  
+    
+    # --- FoE-SPECIFIC SETTINGS  ---
+    NUM_EXPERTS = NUM_EXPERTS        # J=5 expert filters
+    FILTER_SIZE = FILTER_SIZE        # 5×5 kernels
+    IN_CHANNELS = IN_CHANNELS        # 1 channel (grayscale CT)
+    THETA_SIZE = THETA_SIZE          # 261 total parameters
+    
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def norm(img):
+    img = torch.clamp(img, min=-150, max=250)
+    img = (img + 150) / 400.0
+    return img
+
+def norm_z_score(img):
+    mean = img.mean()
+    std = img.std()
+    if std > 0:
+        img = (img - mean) / std
+    else:
+        img = torch.zeros_like(img)
+    return img
+
+# ==========================================
+#        2. HELPER FUNCTIONS
+# ==========================================
+class DiceBCELoss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(DiceBCELoss, self).__init__()
+        self.bce = nn.BCELoss()
+
+    def forward(self, inputs, targets, smooth=1):
+        bce_loss = self.bce(inputs, targets)
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+        intersection = (inputs * targets).sum()                            
+        dice = (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)  
+        dice_loss = 1 - dice
+        return 0.9 * bce_loss + 0.1 * dice_loss
+
+
+def print_progress(epoch, batch, total_batches, loss, theta, info=""):
+    global_w, filt_w, smooth_p, filters = parse_theta(theta)
+    gw = torch.exp(global_w).item()
+    mean_fw = torch.exp(filt_w).mean().item()
+    mean_nu = torch.exp(smooth_p).mean().item()
+    fn = filters.norm().item()
+    sys.stdout.write(f"\r[{info}] Ep {epoch+1} | Batch {batch+1}/{total_batches} | "
+                     f"Loss: {loss:.4f} | GW: {gw:.3f} | FW: {mean_fw:.4f} | ν: {mean_nu:.4f} | FN: {fn:.2f}")
+    sys.stdout.flush()
+
+
+
+def validate(model, val_loader, physics_op, theta=None, steps=0, mode="clean", modality="CT"):
+    model.eval()
+    dice_score = 0.0
+    
+    for i, (img, mask) in enumerate(val_loader):
+        img, mask = img.to(Config.DEVICE), mask.to(Config.DEVICE)
+        
+        # --- MODE 1: CLEAN (Upper Bound) ---
+        if mode == "clean":
+            if(modality=="CT"): x_in = norm(img)
+            elif(modality=="MRI"): x_in = norm_z_score(img)
+        
+        # --- MODE 2: NOISY (Lower Bound) ---
+        elif mode == "noisy":
+            if(modality=="CT"):
+                y_clean = physics_op(img)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+                with torch.no_grad():
+                    x_recon = physics_op.A_dagger(y)
+                    x_in = norm(x_recon)
+            elif(modality=="MRI"):
+                imaginary_part = torch.zeros_like(img)
+                complex_input = torch.cat([img, imaginary_part], dim=1)
+                y_clean = physics_op(complex_input)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+                with torch.no_grad():
+                    x_recon = physics_op.A_dagger(y)
+                    magnitude = torch.sqrt(x_recon[:, 0:1, :, :]**2 + x_recon[:, 1:2, :, :]**2 + 1e-8)
+                    x_in = norm_z_score(magnitude)
+
+        # --- MODE 3: HOAG (Optimized Reconstruction) ---
+        elif mode == "hoag":
+            if(modality=="CT"):
+                y_clean = physics_op(img)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+                w = physics_op.A_dagger(y).detach().clone()
+                w.requires_grad_(True)
+                optimizer_inner = torch.optim.Adam([w], lr=Config.INNER_LR)
+                scheduler_inner = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_inner, T_max=steps, eta_min=Config.INNER_LR * 0.01)
+                with torch.enable_grad():
+                    for _ in range(steps):
+                        optimizer_inner.zero_grad()
+                        loss = inner_loss_func(w, theta, y, physics_op)
+                        loss.backward()
+                        optimizer_inner.step()
+                        scheduler_inner.step()
+                x_recon = w.detach()
+                x_in = norm(x_recon)
+            elif(modality=="MRI"):
+                imaginary_part = torch.zeros_like(img)
+                complex_input = torch.cat([img, imaginary_part], dim=1)
+                y_clean = physics_op(complex_input)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+                w = physics_op.A_dagger(y).detach().clone()
+                w.requires_grad_(True)
+                optimizer_inner = torch.optim.Adam([w], lr=Config.INNER_LR)
+                scheduler_inner = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_inner, T_max=steps, eta_min=Config.INNER_LR * 0.01)
+                with torch.enable_grad():
+                    for _ in range(steps):
+                        optimizer_inner.zero_grad()
+                        loss = inner_loss_func(w, theta, y, physics_op)
+                        loss.backward()
+                        optimizer_inner.step()
+                        scheduler_inner.step()
+                x_recon = w.detach()
+                magnitude = torch.sqrt(x_recon[:, 0:1, :, :]**2 + x_recon[:, 1:2, :, :]**2 + 1e-8)
+                x_in = norm_z_score(magnitude)
+
+        # Predict segmentation mask
+        with torch.no_grad():
+            pred = (model(x_in) > 0.5).float()
+            intersection = (pred * mask).sum()
+            union = pred.sum() + mask.sum()
+            dice_score += (2. * intersection + 1e-6) / (union + 1e-6)
+            
+    return dice_score.item() / len(val_loader)
+
+# ==========================================
+#        3. θ CLAMPING FOR FoE
+# ==========================================
+def clamp_theta(theta):
+    with torch.no_grad():
+        # Global weight
+        theta[0].clamp_(-6.0, 4.0)
+        # Per-filter weights
+        theta[1:1 + Config.NUM_EXPERTS].clamp_(-6.0, 4.0)
+        # Smoothing params
+        theta[1 + Config.NUM_EXPERTS : 1 + 2 * Config.NUM_EXPERTS].clamp_(-8.0, 2.0)
+
+
+# ==========================================
+#        4. MAIN EXPERIMENT
+# ==========================================
+def run_experiment():
+    SEED = 42
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    
+    print(f"--- Starting Experiment: {Config.TASK} (HOAG + FoE Regularizer) ---")
+    print(f"    FoE: {Config.NUM_EXPERTS} experts, {Config.FILTER_SIZE}x{Config.FILTER_SIZE} filters, "
+          f"{Config.THETA_SIZE} total params")
+    print(f"    HOAG: tol_init={Config.HOAG_EPSILON_TOL_INIT}, "
+          f"schedule={Config.HOAG_TOLERANCE_DECREASE}")
+    os.makedirs(Config.OUTPUT_DIR, exist_ok=True)
+    
+    # ====================================================================
+    # DATA SETUP
+    # ====================================================================
+    full_ds = MSDDataset(Config.DATA_ROOT, Config.TASK, Config.IMG_SIZE, Config.MODALITY, Config.SUBSET_SIZE)
+    train_len = int(Config.TRAIN_SPLIT * len(full_ds))
+    val_len   = int(Config.VAL_SPLIT * len(full_ds))
+    test_len  = len(full_ds) - train_len - val_len
+    train_ds, val_ds, test_ds = random_split(full_ds, [train_len, val_len, test_len])
+    
+    train_loader = DataLoader(train_ds, batch_size=Config.BATCH_SIZE, shuffle=True)
+    val_loader   = DataLoader(val_ds,   batch_size=1, shuffle=False)
+    test_loader  = DataLoader(test_ds,  batch_size=1, shuffle=False)
+    
+    # ====================================================================
+    # PHYSICS OPERATOR
+    # ====================================================================
+    physics = get_physics_operator(Config.IMG_SIZE, Config.ACCEL, Config.CENTER_FRAC, Config.DEVICE, modality=Config.MODALITY)
+    
+    loss_fn = DiceBCELoss()
+    results = {}
+    # Dummy theta
+    dummy_theta = torch.zeros(Config.THETA_SIZE, device=Config.DEVICE)
+    
+    # ====================================================================
+    # PHASE 1: UPPER BOUND — Load from task_adapted_recon_medical
+    # ====================================================================
+    print("\n--- PHASE 1: Upper Bound (Loading from task_adapted_recon_medical) ---")
+    model_upper = UNet().to(Config.DEVICE)
+    ckpt_path = Config.UPPER_BOUND_CKPT
+
+    ckpt = torch.load(ckpt_path, map_location=Config.DEVICE)
+    if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
+        model_upper.load_state_dict(ckpt["model_state_dict"])
+    else:
+        model_upper.load_state_dict(ckpt)
+    model_upper.eval()
+    print(f"  Loaded upper bound from {ckpt_path}")
+
+    # Also save a local copy for Approach 1/2 to load
+    local_ckpt_path = os.path.join(Config.OUTPUT_DIR, "model_upper_clean.pth")
+    torch.save(model_upper.state_dict(), local_ckpt_path)
+
+    results['Upper Bound'] = validate(model_upper, test_loader, physics, theta=dummy_theta, mode="clean", modality=Config.MODALITY)
+    print(f" -> Final Upper Bound (Clean): {results['Upper Bound']:.4f}")
+
+    # ====================================================================
+    # PHASE 2: LOWER BOUND — Test Clean Model on Noisy Physics
+    # ====================================================================
+    print("\n--- PHASE 2: Lower Bound (Testing Clean Model on Noisy Physics) ---")
+    results['Lower Bound'] = validate(model_upper, test_loader, physics, theta=dummy_theta, mode="noisy", modality=Config.MODALITY)
+    print(f" -> Final Lower Bound (Noisy): {results['Lower Bound']:.6f}")
+
+    # ====================================================================
+    # PHASE 3: APPROACH 1 — HOAG: Optimize theta Only (Fixed U-Net)
+    # ====================================================================
+    # Same structure as my_exp Phase 3, but theta now has 50 FoE parameters
+    print("\n--- PHASE 3: Approach 1 (HOAG + FoE — Optimizing Theta Only) ---")
+    
+    model_fixed = UNet().to(Config.DEVICE)
+    model_fixed.load_state_dict(torch.load(local_ckpt_path, map_location=Config.DEVICE)) 
+    #model_fixed.train()
+    model_fixed.eval()
+    for p in model_fixed.parameters():
+        p.requires_grad = False
+    
+    # Initialize theta with derivative-like FoE filters
+    theta = initialize_theta(Config.DEVICE).requires_grad_(True)
+    opt_theta = torch.optim.Adam([theta], lr=Config.LR_THETA)
+    sched_theta = torch.optim.lr_scheduler.CosineAnnealingLR(opt_theta, T_max=Config.EPOCHS_HOAG, eta_min=1e-5)
+    
+    hoag_state = HOAGState(
+        epsilon_tol_init=Config.HOAG_EPSILON_TOL_INIT,
+        tolerance_decrease=Config.HOAG_TOLERANCE_DECREASE,
+        exponential_decrease_factor=Config.HOAG_DECREASE_FACTOR
+    )
+    
+    path_hoag = os.path.join(Config.OUTPUT_DIR, "hoag_theta_foe.pth")
+
+    for ep in range(Config.EPOCHS_HOAG): 
+        for i, (img, mask) in enumerate(train_loader):
+            img, mask = img.to(Config.DEVICE), mask.to(Config.DEVICE)
+            
+            if(Config.MODALITY=="CT"):
+                y_clean = physics(img)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+            elif(Config.MODALITY=="MRI"):
+                imaginary_part = torch.zeros_like(img)
+                complex_input = torch.cat([img, imaginary_part], dim=1)
+                y_clean = physics(complex_input)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+            
+            hyper_grad, val_loss_value, w_star = hoag_step(
+                theta=theta,
+                y=y,
+                physics_op=physics,
+                model=model_fixed,
+                loss_fn=loss_fn,
+                mask=mask,
+                inner_loss_fn=inner_loss_func,
+                state=hoag_state,
+                inner_lr=Config.INNER_LR,
+                inner_steps=Config.INNER_STEPS,
+                cg_max_iter=Config.HOAG_CG_MAX_ITER,
+                verbose=0,
+                modality=Config.MODALITY
+            )
+            
+            opt_theta.zero_grad()
+            hyper_grad = hyper_grad * Config.HYPER_GRAD_SCALE
+            grad_norm = hyper_grad.norm()
+            max_grad_norm = 10.0
+            if grad_norm > max_grad_norm:
+                hyper_grad = hyper_grad * (max_grad_norm / grad_norm)
+            theta.grad = hyper_grad
+            opt_theta.step()
+            clamp_theta(theta)
+            
+            print_progress(ep, i, len(train_loader), val_loss_value, theta, "Appr 1 (FoE)")
+        
+        hoag_state.decrease_tolerance()
+        sched_theta.step()
+        # Save theta at end of each epoch
+        torch.save({'theta': theta, 'hoag_state_epsilon': hoag_state.epsilon_tol, 'epoch': ep}, path_hoag)
+        print(f"  [eps_tol: {hoag_state.epsilon_tol:.2e}]  saved theta")
+
+    # Final test with last theta
+    results['Approach 1'] = validate(model_fixed, test_loader, physics, theta, Config.INNER_STEPS, mode="hoag", modality=Config.MODALITY)
+    print(f" -> Final Approach 1 Score: {results['Approach 1']:.4f}")
+
+    # ====================================================================
+    # PHASE 4: APPROACH 2 — HOAG Joint Learning (theta + U-Net)
+    # ====================================================================
+    print("\n--- PHASE 4: Approach 2 (Joint Learning — FoE Theta + U-Net) ---")
+    
+    model_joint = UNet().to(Config.DEVICE)
+    model_joint.load_state_dict(torch.load(local_ckpt_path, map_location=Config.DEVICE))
+    opt_model = torch.optim.Adam(model_joint.parameters(), lr=Config.LR_UNET)
+    
+    #theta = torch.load(path_hoag)['theta'].to(Config.DEVICE).requires_grad_(True)
+    theta = initialize_theta(Config.DEVICE).requires_grad_(True)
+    opt_theta = torch.optim.Adam([theta], lr=Config.LR_THETA)
+    sched_theta_joint = torch.optim.lr_scheduler.CosineAnnealingLR(opt_theta, T_max=Config.EPOCHS_JOINT, eta_min=1e-5)
+    
+    hoag_state_joint = HOAGState(
+        epsilon_tol_init=Config.HOAG_EPSILON_TOL_INIT,
+        tolerance_decrease=Config.HOAG_TOLERANCE_DECREASE,
+        exponential_decrease_factor=Config.HOAG_DECREASE_FACTOR
+    )
+    
+    path_joint = os.path.join(Config.OUTPUT_DIR, "model_joint_foe.pth")
+    path_theta_joint = os.path.join(Config.OUTPUT_DIR, "theta_joint_foe.pth")
+
+    for ep in range(Config.EPOCHS_JOINT):
+        for i, (img, mask) in enumerate(train_loader):
+            img, mask = img.to(Config.DEVICE), mask.to(Config.DEVICE)
+            
+            if(Config.MODALITY=="CT"):
+                y_clean = physics(img)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+            elif(Config.MODALITY=="MRI"):
+                imaginary_part = torch.zeros_like(img)
+                complex_input = torch.cat([img, imaginary_part], dim=1)
+                y_clean = physics(complex_input)
+                y = y_clean + Config.NOISE_SIGMA * torch.randn_like(y_clean)
+            
+            # STEP A: Solve Inner Problem
+            w_star, _ = solve_inner_problem(
+                w_init=physics.A_dagger(y).detach().clone(),
+                theta=theta,
+                y=y,
+                physics_op=physics,
+                inner_loss_fn=inner_loss_func,
+                state=hoag_state_joint,
+                lr=Config.INNER_LR,
+                max_steps=Config.INNER_STEPS,
+                verbose=0
+            )
+            
+            # STEP B: Update U-Net Weights
+            w_fixed = w_star.detach().clone().requires_grad_(False)
+            if(Config.MODALITY=="CT"): x_in = norm(w_fixed)
+            elif(Config.MODALITY=="MRI"):
+                magnitude = torch.sqrt(w_fixed[:, 0:1, :, :]**2 + w_fixed[:, 1:2, :, :]**2 + 1e-8)
+                x_in = norm_z_score(magnitude)
+            
+            model_joint.train()
+            opt_model.zero_grad()
+            loss_unet = loss_fn(model_joint(x_in), mask)
+            loss_unet.backward()
+            opt_model.step()
+            
+            # STEP C: Update theta via HOAG Hypergradient
+            model_joint.eval()
+            
+            hyper_grad, val_loss_value, w_star = hoag_step(
+                theta=theta,
+                y=y,
+                physics_op=physics,
+                model=model_joint,
+                loss_fn=loss_fn,
+                mask=mask,
+                inner_loss_fn=inner_loss_func,
+                state=hoag_state_joint,
+                inner_lr=Config.INNER_LR,
+                inner_steps=Config.INNER_STEPS,
+                cg_max_iter=Config.HOAG_CG_MAX_ITER,
+                verbose=0,
+                modality=Config.MODALITY
+            )
+            
+            opt_theta.zero_grad()
+            hyper_grad = hyper_grad * Config.HYPER_GRAD_SCALE
+            grad_norm = hyper_grad.norm()
+            max_grad_norm = 10.0
+            if grad_norm > max_grad_norm:
+                hyper_grad = hyper_grad * (max_grad_norm / grad_norm)
+            theta.grad = hyper_grad
+            opt_theta.step()
+            clamp_theta(theta)
+            
+            print_progress(ep, i, len(train_loader), val_loss_value, theta, "Appr 2 (Joint)")
+        
+        hoag_state_joint.decrease_tolerance()
+        sched_theta_joint.step()
+        # Save model + theta at end of each epoch
+        torch.save(model_joint.state_dict(), path_joint)
+        torch.save({'theta': theta, 'hoag_state_epsilon': hoag_state_joint.epsilon_tol, 'epoch': ep}, path_theta_joint)
+        print(f"  [eps_tol: {hoag_state_joint.epsilon_tol:.2e}]  saved model + theta")
+
+    # Final test with last model + theta
+    results['Approach 2'] = validate(model_joint, test_loader, physics, theta, Config.INNER_STEPS, mode="hoag", modality=Config.MODALITY)
+    print(f" -> Final Approach 2 Score: {results['Approach 2']:.4f}")
+    
+    # ====================================================================
+    # FINAL RESULTS
+    # ====================================================================
+    print("\n=== FINAL RESULTS (FoE) ===")
+    print(f"1. Upper Bound: {results['Upper Bound']:.4f}")
+    print(f"2. Lower Bound: {results['Lower Bound']:.4f}")
+    print(f"3. Approach 1:  {results['Approach 1']:.4f}")
+    print(f"4. Approach 2:  {results['Approach 2']:.4f}")
+
+    results_path = os.path.join(Config.OUTPUT_DIR, "final_results.txt")
+    with open(results_path, "w") as f:
+        f.write("=== FINAL RESULTS (FoE Regularizer) ===\n")
+        f.write(f"Task: {Config.TASK}\n")
+        f.write(f"Accel: {Config.ACCEL}x | Noise: {Config.NOISE_SIGMA}\n")
+        f.write(f"FoE: {Config.NUM_EXPERTS} experts, {Config.FILTER_SIZE}x{Config.FILTER_SIZE} filters, "
+                f"{Config.THETA_SIZE} params\n")
+        f.write(f"Epochs: HOAG={Config.EPOCHS_HOAG}, Joint={Config.EPOCHS_JOINT} | Inner Steps: {Config.INNER_STEPS}\n\n")
+        f.write(f"1. Upper Bound (Clean):      {results['Upper Bound']:.4f}\n")
+        f.write(f"2. Lower Bound (Noisy):      {results['Lower Bound']:.4f}\n")
+        f.write(f"3. Approach 1 (HOAG theta):  {results['Approach 1']:.4f}\n")
+        f.write(f"4. Approach 2 (HOAG joint):  {results['Approach 2']:.4f}\n")
+        
+        f.write(f"\n--- Final Theta ---\n")
+        global_w, filt_w, smooth_p, filters = parse_theta(theta)
+        f.write(f"Global weight: e^{global_w.item():.4f} = {torch.exp(global_w).item():.6f}\n")
+        for k in range(Config.NUM_EXPERTS):
+            f.write(f"Expert {k+1}: weight=e^{filt_w[k].item():.4f}={torch.exp(filt_w[k]).item():.6f}, "
+                    f"nu={torch.exp(smooth_p[k]).item():.6f}\n")
+            f.write(f"  Filter:\n{filters[k].detach().cpu().numpy()}\n")
+    
+    print(f"\nResults saved to: {results_path}")
+
+if __name__ == "__main__":
+    run_experiment()

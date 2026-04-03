@@ -1,0 +1,22 @@
+# Virtual Environments
+.venv/
+env/
+venv/
+
+# PyTorch / Machine Learning Models
+*.pt
+*.pth
+*.h5
+*.pkl
+
+# My Specific Datasets
+data_medical/
+data_mnist/
+*.csv
+*.tar
+*.gz
+*.zip
+
+# Python Cache
+__pycache__/
+*.pyc

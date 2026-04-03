@@ -1,0 +1,44 @@
+============================================================
+  Medical Task-Adapted Reconstruction
+  Mode: upper_bound  |  Modality: ct
+  Device: cuda  |  Image size: 128
+  Subset: full
+============================================================
+Power iteration converged at iteration 10, ||A^T A||_2=5565.70
+Scanning 41 volumes for Task: Task09_Spleen...
+  -> Source: C:\Users\mukta\OneDrive\Desktop\mnist_exp\data_medical\ct_data\Task09_Spleen\Task09_Spleen\imagesTr
+  -> Valid Slices Found: 1051
+  Train samples : 841
+  Val samples   : 105
+  Test samples  : 105
+
+============================================================
+Upper Bound - Segmentation on clean images
+============================================================
+  [Upper] Epoch 1/30  loss=0.9081  dice=7.4%  val_loss=0.8915  val_dice=27.6%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 2/30  loss=0.8900  dice=35.4%  val_loss=0.8815  val_dice=52.9%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 3/30  loss=0.8810  dice=55.6%  val_loss=0.8736  val_dice=67.5%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 4/30  loss=0.8723  dice=65.5%  val_loss=0.8641  val_dice=71.8%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 5/30  loss=0.8634  dice=71.3%  val_loss=0.8571  val_dice=72.4%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 6/30  loss=0.8533  dice=74.7%  val_loss=0.8445  val_dice=78.5%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 7/30  loss=0.8437  dice=73.7%  val_loss=0.8370  val_dice=69.7%
+  [Upper] Epoch 8/30  loss=0.8317  dice=74.1%  val_loss=0.8170  val_dice=78.2%
+  [Upper] Epoch 9/30  loss=0.8245  dice=72.1%  val_loss=0.8074  val_dice=74.7%
+  [Upper] Epoch 10/30  loss=0.8009  dice=75.2%  val_loss=0.7816  val_dice=75.4%
+  [Upper] Epoch 11/30  loss=0.7773  dice=74.0%  val_loss=0.7524  val_dice=79.0%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 12/30  loss=0.7336  dice=79.7%  val_loss=0.6869  val_dice=83.1%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 13/30  loss=0.6549  dice=85.2%  val_loss=0.5869  val_dice=86.8%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 14/30  loss=0.5391  dice=87.7%  val_loss=0.4479  val_dice=88.4%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 15/30  loss=0.4013  dice=88.1%  val_loss=0.3111  val_dice=90.3%
+[checkpoint] saved -> ./results_medical\upper_bound\upper_best.pt
+  [Upper] Epoch 16/30  loss=0.2857  dice=89.0%  val_loss=0.3113  val_dice=75.7%
