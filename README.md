@@ -1,4 +1,4 @@
-# Bilevel Learning for Task-Adapted Reconstruction (BL-TAR)
+# Bilevel Learning for Task-Adapted Regularizer (BL-TAR)
 
 A research codebase for **bilevel optimization**–based image reconstruction, where a reconstruction operator and its regularizer are jointly optimized with a downstream task (classification or segmentation). The framework learns to reconstruct images from corrupted/incomplete measurements in a way that maximally benefits the end task, rather than optimizing reconstruction quality in isolation.
 
