@@ -1,0 +1,461 @@
+\chapter{Experimentation and Results}
+
+\lhead{Chapter 5. \emph{Experimentation and Results}} % Change X to a consecutive number; this is for the header on each page - perhaps a shortened title
+
+
+\label{sec:experiments}
+% \begin{table}[htbp]
+% \centering
+% \caption{\textsc{Hyperparameters for CT and MRI Experiments}}
+% \label{tab:hyperparameters}
+% \begin{tabular}{llcc}
+% \toprule
+% \textbf{Category} & \textbf{Hyperparameter} & \textbf{CT Setup} & \textbf{MRI Setup} \\
+% \midrule
+% \multirow{3}{*}{\textbf{Dataset}} 
+%  & Train/Val/Test split & 70\% / 15\% / 15\% & 70\% / 15\% / 15\% \\
+%  & Image size & $128 \times 128$ & $128 \times 128$ \\
+%  & Batch size & 64 & 64 \\
+% \midrule
+% \multirow{3}{*}{\textbf{Physics}} 
+%  & Forward Model & Sparse Radon Transform & Subsampled Fourier \\
+%  & Measurement & 60 Projection Views & 12x Undersampling \\
+%  & Noise $\sigma$ & 3 & 0.5 \\
+% \midrule
+% % \textbf{Regularizer} 
+% %  & Type & TV (2) / FoE (136) & TV (2) / FoE (136) \\
+% % \midrule
+% \multirow{3}{*}{\textbf{Outer Opt.}} 
+%  & Task Net LR ($\eta_\phi$) & $5 \times 10^{-4}$ (U-Net) & $5 \times 10^{-4}$ (U-Net) \\
+%  & Theta LR ($\eta_\theta$) & 0.05 & 0.05 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+% ===========================================================================
+%  COMPREHENSIVE RESULTS TABLE
+% ===========================================================================
+
+\begin{table*}[t]
+\centering
+\caption{Quantitative comparison of different task-adapted reconstruction approaches across three inverse problems. The column \textit{decoupled} refers to the score obtained by applying a pre-trained $T_{\phi}$ on $(x,t)$ pairs on the output of a separately trained $R_{\gamma}$ on $(y,x)$ pairs. In contrast, the \textit{upper bound} represents the score achieved by the task network on the clean reference image $x$. These scores indicate the minimum and maximum performance achievable using any ask-adapted recovery method, respectively. The Joint learning \cite{adler2022task} score is reported for the best $c$ value obtained using a grid-search over $[0, 1]$. For MNIST, we report the overall accuracy on the test set, while for the CT and MRI experiments on the MSD challenge datasets, we report the dice scores for segmentation. learning $T_{\phi}$ and $g_{\theta}$ using the bilevel framework achieves a competitive performance with \cite{adler2022task}, without the need for any hyperparameter tuning.}
+\label{tab:comprehensive_results}
+\resizebox{\textwidth}{!}{%
+\renewcommand{\arraystretch}{1.3} % Adds a bit of vertical padding to the cells
+\vspace{15pt}
+\begin{tabular}{|l|l|c|c|c|c|c|c|c|c|c|}
+\hline
+\textbf{Dataset} & \textbf{Inverse problem} & \multicolumn{2}{c|}{\textbf{Baselines}} & \multicolumn{3}{c|}{\textbf{Adler et al. \cite{adler2022task}}} & \multicolumn{4}{c|}{\textbf{Bilevel learning (ours)}} \\
+\cline{3-11}
+ & & \textbf{Decoupled} & \textbf{Upper bound} & \textbf{Sequential} & \textbf{End-to-end} & \textbf{Joint} & \multicolumn{2}{c|}{\textbf{Fixed $T_{\phi}$}} & \multicolumn{2}{c|}{\textbf{Joint $T_\phi$ and $g_{\theta}$}} \\
+\cline{8-11}
+ & & & & & & & \textbf{TV} & \textbf{FoE} & \textbf{TV} & \textbf{FoE} \\
+\hline
+\textbf{MNIST}  & Gaussian blur        & 92.72\% & 99.35\% & 98.26\% & 98.70\% & 98.87\% & 67.31\% & 90.32\% & 98.49\% & 98.85\% \\
+\hline
+\textbf{Spleen} & CT & 0.8120 & 0.9278 & 0.8795 & 0.9034 & 0.9148 & 0.7334 & 0.7217 & 0.8727 & 0.8929 \\
+\hline
+\textbf{Heart}  & MRI & 0.8116 & 0.9173 & 0.8876 & 0.9055 & 0.9139 & 0.5822 & 0.5726 & 0.8422 & 0.8470 \\
+\hline
+\end{tabular}%
+}
+\label{tab_main_table_results}
+\end{table*}
+\vspace{10pt}
+\begin{figure*}[t]
+    \centering
+    % Slightly reduce the space between columns to ensure everything fits
+    \setlength{\tabcolsep}{2pt} 
+    
+    % This makes all text inside the tabular environment smaller
+    \footnotesize 
+    \begin{tabular}{cccccccc}
+        % Row 1: The images 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_x_clean.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_y_blurred.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_Adagy.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_Sequential.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_End-to-End.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_Joint.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_A1_FoE.png} & 
+        \includegraphics[width=0.12\textwidth]{mnist/label7_sample0_A2_FoE.png} \\
+        
+        % Row 2: Sub-labels 
+        % (a) & (b) & (c) & (d) & (e) & (f) & (g) & (h) \\
+        
+        % Row 3: Custom text below each image
+        \scriptsize ground-truth ($x$) & 
+        \scriptsize measurement ($y$) & 
+        \scriptsize $A^{\dagger}y$ & 
+        \scriptsize sequential & 
+        \scriptsize end to end & 
+        \scriptsize joint ($c=0.5$) & 
+        \scriptsize bilevel (fixed $T_{\phi}$) & 
+        \scriptsize bilevel (joint) \\
+    \end{tabular}
+    \vspace{10pt} % Added space before caption
+    \caption{Reconstructed MNIST images from blurry and noisy measurements for different approaches. The bilevel approach, where $T_\phi$ and $g_{\theta}$ are jointly learned, leads to a considerably high-fidelity artifact-free reconstruction, leading to better classification accuracy.}
+    \label{fig:mnist_predictions}
+\end{figure*}
+    
+\begin{figure*}[htbp]
+    \centering
+    \setlength{\tabcolsep}{4pt} 
+    
+    % The vertical bar (|) isolates the first column (measurements) from the rest
+    \begin{tabular}{c | c c c c c c}
+        
+        % Row 1: Reconstructed Images (Top row)
+        \includegraphics[width=0.14\textwidth, height=0.14\textwidth]{spleen/spleen_sample0_y_sinogram.png} &
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_x_clean_recon.png} &  
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_Sequential_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_End-to-End_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_Joint_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_A1_FoE_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_A2_FoE_recon.png} \\
+        [3pt] % Clean gap before the middle caption
+        
+        % Row 2: Caption for the sinogram (Moved to Column 1, others left blank)
+        \scriptsize measurement ($y$) & & & & & & \\
+        [5pt] % Slightly larger gap so this label doesn't crash into the image below it
+        
+        % Row 3: Segmentation Masks (and A^dagger y image in measurement column)
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_A_dagy_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_gt_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_Sequential_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_End-to-End_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_Joint_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_A1_FoE_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{spleen/spleen_sample0_A2_FoE_mask.png} \\
+        [3pt] % Clean gap before the final labels
+        
+        % Row 4: Final Approach Labels
+        \scriptsize $A^{\dagger}y$ &
+        \scriptsize ground-truth ($x$) &  
+        \scriptsize sequential & 
+        \scriptsize end-to-end & 
+        \scriptsize joint ($c=0.5$) & 
+        \scriptsize bilevel (fixed $T_{\phi}$) & 
+        \scriptsize bilevel (joint) \\
+        &
+        &
+        \scriptsize (0.909) &
+        \scriptsize (0.928) &
+        \scriptsize (0.945) &
+        \scriptsize (0.769) &
+        \scriptsize (0.936) \\
+    \end{tabular}
+    \vspace{10pt} % Added space before caption
+    \caption{Comparison of reconstructed images (top row) and their corresponding segmentation masks (bottom row) across different approaches for CT. The proposed bilevel approach performs on par with joint learning \cite{adler2022task}, corresponding to the best value of $c$ found through a grid-search.}
+    \label{fig:reconstruction_and_masks_ct}
+\end{figure*}
+
+\begin{figure*}[htbp]
+    \centering
+    \setlength{\tabcolsep}{4pt} 
+    
+    % The vertical bar (|) isolates the first column (measurements) from the rest
+    \begin{tabular}{c | c c c c c c}
+        
+        % Row 1: Reconstructed Images (Top row)
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_y_sinogram.png} &
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_x_clean_recon.png} &  
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_Sequential_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_End-to-End_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_Joint_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_A1_FoE_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_A2_FoE_recon.png} \\
+        [3pt] % Clean gap before the middle caption
+        
+        % Row 2: Caption for the raw image (Moved to Column 1, others left blank)
+        \scriptsize measurement ($y$) & & & & & & \\
+        [5pt] % Slightly larger gap so this label doesn't crash into the image below it
+        
+        % Row 3: Segmentation Masks (and A^dagger y image in measurement column)
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_A_dagy_recon.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_gt_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_Sequential_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_End-to-End_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_Joint_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_A1_FoE_mask.png} & 
+        \includegraphics[width=0.14\textwidth]{heart/heart_sample4_A2_FoE_mask.png} \\
+        [3pt] % Clean gap before the final labels
+        
+        % Row 4: Final Approach Labels
+        \scriptsize $A^{\dagger}y$ &
+        \scriptsize ground truth ($x$) &  
+        \scriptsize sequential & 
+        \scriptsize end-to-end & 
+        \scriptsize joint ($c=0.6$) & 
+        \scriptsize bilevel (fixed $T_{\phi}$) & 
+        \scriptsize bilevel (joint)\\
+        &
+        &
+        \scriptsize (0.928) &
+        \scriptsize (0.941) &
+        \scriptsize (0.933) &
+        \scriptsize (0.790) &
+        \scriptsize (0.958) \\
+        
+    \end{tabular}
+    \vspace{10pt} % Added space before caption
+    \caption{Comparison of reconstructed images (top) and their corresponding segmentation masks (bottom) across different approaches for MRI. As indicated by the dice scores below the images, the bilevel approach with jointly learned $T_{\phi}$ and $g_{\theta}$ achieves a competitive or slightly better segmentation accuracy than its nearest competitor while using a significantly parsimonious parameterization of the regularizer (vis-à-vis the deep reconstruction network).}
+    \label{fig:reconstruction_and_masks_mri}
+\end{figure*}
+The performance of the proposed task-driven bilevel learning framework is evaluated for three problems: (i) classification on blurry and noisy images, to show proof-of-concept; and image segmentation in (ii) CT and (iii) MRI; to demonstrate the efficacy of the proposed method on challenging practical inverse problems in medical imaging. For the CT and MRI experiments, we use the \textit{Spleen} and \textit{Heart} image datasets, respectively, from the medical decathlon segmentation (MDS) challenge \cite{Antonelli2022}. We use the \textit{Deep Inverse} library \cite{Tachella2025DeepInverse} for implementing the forward, adjoint, and pseudo-inverse (which is the filtered back-projection for CT and the zero-filled inversion for MRI) operators in CT and MRI.
+\subsection{Training strategies}
+\noindent The experimental results corresponding to the following two training strategies are reported: 
+\begin{enumerate}[leftmargin=*,nosep]
+    \item \textbf{Pretrained task operator}: Here, we first train a task network $T_{\phi}$ on a training dataset consisting of pairs $(x_i,t_i)_{i=1}^N$ of ground-truth images and the corresponding task labels, and then keep it frozen while updating the regularizer parameters using bilevel learning (see Algorithm \ref{alg:appr1}).    
+    % A pre-trained classifier $T_\phi$ is frozen, and only the regularization parameters $\theta$ are optimized via the HOAG hypergradient.
+    \item \textbf{Joint learning of the regularizer and the task operator}: In this setting, $T_{\phi}$ and $g_{\theta}$ are optimized jointly in an alternating fashion. The parameters $\phi$ of the task network are updated via standard backpropagation on the upper-level loss $J(\theta,\phi)$, while $\theta$ is updated using an inexact gradient $p_{\theta}\approx\nabla_{\theta}J(\theta,\phi)$ as outlined in Algorithm \ref{alg:appr1}.
+\end{enumerate}
+We found that for all experiments, the latter approach (learning both $T_{\phi}$ and $g_{\theta}$) works significantly better than adapting the regularizer to a fixed, pre-trained task network. 
+\subsection{Regularizer parameterizations}
+We employ the following two parameterizations of $g_{\theta}$, both of which lead to a strongly convex (w.r.t. $x$, for a given $\theta$) and differentiable (w.r.t. both $x$ and $\theta$) lower-level loss $\Phi(x,\theta)$: 
+\begin{enumerate}[leftmargin=*,nosep]
+    \item The \textit{smoothed isotropic TV regularizer}, with only two learnable parameters $\theta_0$ and $\theta_1$, defined as
+\begin{equation}
+\textstyle
+    g_\theta(x) = \frac{e^{\theta_0}}{n} \sum_{i,j} \sqrt{(\nabla_h x)_{i,j}^2 + (\nabla_v x)_{i,j}^2 + e^{\theta_1}},
+\end{equation}
+where $\nabla_h x$ and $\nabla_v x$ denote horizontal and vertical finite difference operators, $e^{\theta_0}$ is a penalty term, and $e^{\theta_1}$ is a smoothing parameter that ensures differentiability of $\Phi(x,\theta)$ with respect to both $x$ and $\theta=[\theta_0,\theta_1]$. 
+\item The fields-of-experts (FoE) regularizer \cite{Yunjin_Chen_2014,Crockett_2022} that uses $L$ learned filters (or \textit{experts}) to learn image features:
+\begin{equation}
+\textstyle
+    g_\theta(x) = e^{\theta_0} \cdot \sum_{j=1}^{L} e^{\beta_j} \cdot \frac{1}{n}\sum_{i,k} \rho_{\nu_j}\left((c_j \circledast x)_{i,k}\right).
+\end{equation}
+Here, $\circledast$ denotes 2D convolution, $c_j \in \mathbb{R}^{K \times K}$ are learnable filters, $\theta_0$ is the log-space global regularization weight, $\beta_j$s are per-expert log-space weights, and $\rho_{\nu_j}(t) = \sqrt{t^2 + e^{\nu_j}}$ denotes a smoothed $\ell_1$ penalty with a learnable smoothing parameter $\nu_j$. For $L$ experts of size $K\times K$, there are a total of $(K^2+2)L+1$ learnable parameters in $g_{\theta}$. The filters in the FoE regularizer are initialized as classical edge and blob detectors, keeping in view the end tasks of classification and segmentation. In particular, the first four filters are initialized as Sobel-like edge extractors along horizontal, vertical, diagonal, and anti-diagonal directions, while the fifth filter is initialized as a $5\times 5$ Laplacian-of-Gaussian kernel \cite{marr1980theory}. These specific choices for the initial filters provide a good starting point for the bilevel optimization framework to further refine them during training to extract the most informative image features for the end task.  
+
+% The $J = 5$ expert filters $\{c_j\}_{j=1}^{5}$ are $5 \times 5$ kernels initialized as edge and texture detectors (scaled by $1/\sqrt{C}$ for multi-channel input):
+
+% \begin{equation}
+% c_1 = \frac{1}{12}\begin{bmatrix}
+% -1 & -1 &  0 &  1 &  1 \\
+% -2 & -2 &  0 &  2 &  2 \\
+% -3 & -3 &  0 &  3 &  3 \\
+% -2 & -2 &  0 &  2 &  2 \\
+% -1 & -1 &  0 &  1 &  1
+% \end{bmatrix} \quad \text{(Horizontal gradient)}
+% \end{equation}
+
+% \begin{equation}
+% c_2 = c_1^\top \quad \text{(Vertical gradient)}
+% \end{equation}
+
+% \begin{equation}
+% c_3 = \frac{1}{6}\begin{bmatrix}
+% -2 & -1 &  0 &  0 &  0 \\
+% -1 & -2 &  0 &  0 &  0 \\
+%  0 &  0 &  0 &  0 &  0 \\
+%  0 &  0 &  0 &  2 &  1 \\
+%  0 &  0 &  0 &  1 &  2
+% \end{bmatrix} \quad \text{(Diagonal $45^\circ$)}
+% \end{equation}
+
+% \begin{equation}
+% c_4 = \text{flip}_{\text{horizontal}}(c_3) \quad \text{(Anti-diagonal $135^\circ$)}
+% \end{equation}
+
+% \begin{equation}
+% c_5 = \frac{1}{16}\begin{bmatrix}
+%  0 &  0 & -1 &  0 &  0 \\
+%  0 & -1 & -2 & -1 &  0 \\
+% -1 & -2 & 16 & -2 & -1 \\
+%  0 & -1 & -2 & -1 &  0 \\
+%  0 &  0 & -1 &  0 &  0
+% \end{bmatrix} \quad \text{(Laplacian of Gaussian)}
+% \end{equation}
+
+% The total parameter vector $\boldsymbol{\theta} \in \mathbb{R}^{261}$ is:
+% \begin{equation}
+% \boldsymbol{\theta} = \left[\underbrace{\theta_0}_{1}, \;\underbrace{\theta_1, \ldots, \theta_5}_{5}, \;\underbrace{\theta_6, \ldots, \theta_{10}}_{5}, \;\underbrace{\text{vec}(c_1), \ldots, \text{vec}(c_5)}_{5 \times 1 \times 5 \times 5 = 125}\right]
+% \end{equation}
+
+% For 2-channel (MRI), THETA_SIZE = 136: filters are 5 × 2 × 5 × 5 = 250, but with IN_CHANNELS=1, it's 5 × 1 × 5 × 5 = 125
+  
+\end{enumerate}
+
+
+
+
+% where:
+% \begin{itemize}
+%     \item  for each expert $j$,
+%     \item $\alpha = \theta_0$ is the log-space global regularization weight,
+%     \item ,
+%     \item $\nu_j = \exp(\gamma_j)$ are per-expert smoothing parameters in log-space,
+%     \item $*$ denotes 2D convolution with same-size padding,
+%     \item $\rho_\nu(t) = \sqrt{t^2 + \nu^2}$ is a smoothed $\ell_1$ penalty (Huber-like) function.
+% \end{itemize}
+
+% The penalty function $\rho_\nu(t) = \sqrt{t^2 + \nu^2}$ is a smoothed $\ell_1$ penalty.
+% The learnable parameter vector is:
+% \begin{equation}
+%     \theta = \bigl[\underbrace{\alpha}_{1},\; \underbrace{\beta_1, \ldots, \beta_J}_{J},\; \underbrace{\gamma_1, \ldots, \gamma_J}_{J},\; \underbrace{c_1, \ldots, c_J}_{J \times C \times K \times K}\bigr] 
+% \end{equation}
+
+% With $J=5$ experts, $K=5$ filter size, and $C=1$ channel, the total number of parameters is $|\theta| = 1 + 10 + 125 = 136$. 
+
+
+\subsection{Task networks}
+For classification on the blurry and noisy MNIST digits, we choose the ResNet-18 architecture \cite{he2016deep} (implemented using the \texttt{torchvision} library, having approximately 11.17 million parameters) for the task network $T_{\phi}$. For the CT and MRI inverse problems, where the intended task is semantic segmentation of specific organs, we employ a standard U-Net architecture~\cite{kerfoot2018left} for $T_{\phi}$ (having 95172 learnable parameters) adapted from the MONAI library~\cite{cardoso2022monai}. We chose a more economical parameterization for the segmentation U-Net to avoid overfitting, as the CT and MRI datasets used in our experiments have only approximately 1000 images (of size $128\times 128$). For comparison with the task-adapted learning approach by Adler et al. \cite{adler2022task}, we parameterize the reconstruction network $R_{\gamma}$ as the composition $G_{\gamma}\circ A^{\dagger}$ (i.e., as a postprocessing network applied on the pseudo-inverse reconstruction), where $G_{\gamma}$ is a U-Net with 378740 learnable parameters.  
+
+
+
+
+
+% --------------------------
+% \subsubsection{U-Net (Medical Segmentation)}
+% For the CT/MRI segmentation tasks,  Two distinct U-Nets are leveraged in the pipeline:
+% \begin{itemize}
+%     \item \textbf{ReconstructionNet:} Contains \textbf{378,740} trainable parameters.
+%     \item \textbf{SegmentationNet:} Contains \textbf{95,172} trainable parameters.
+% \end{itemize}
+
+% \subsubsection{ResNet (MNIST Classification)}
+% For the MNIST dataset, we leverage a modified ResNet-18~\cite{he2016deep} as the downstream classification network (TaskNet), adapted from the \texttt{torchvision} library. This classification network consists of \textbf{11,172,810} trainable parameters.
+% ===========================================================================
+%  SUBSECTION 1: MNIST Dataset
+% ===========================================================================
+\subsection{Classification of blurry and noisy images}
+\label{subsec:mnist_setup}
+The degraded measurement is given by $y=Ax+w$, where $A$ corresponds to a (Gaussian) blur kernel and $w$ denotes additive Gaussian noise with variance $\sigma_w^2$. The training dataset consists of pairs $(y,t)$, where $t$ is the true class label of the image. We utilize the MNIST dataset consisting of $(x,t)$ pairs, and simulate $y$ by applying a $23\times 23$ Gaussian kernel with the standard deviation parameter $\sigma=3$ (to ensure a severe degree of blurring), followed by adding i.i.d. Gaussian noise with $\sigma_w=0.01$. The MNIST dataset is split into training and test datasets, consisting of $60000$ and $10000$ images, respectively. A batch size of 4096 is used during training, and learning rates of $\eta_{\phi}=0.001$ and $\eta_{\theta}=0.05$ are applied for updating the parameters of $T_{\phi}$ and $g_{\theta}$, respectively. Since the task considered here is image classification, $\mathcal{L}_{\text{task}}$ is taken as the standard cross-entropy loss, while we take $\mathcal{L}_{\text{recon}}$ in \eqref{eq_joint_loss_adler} to be the mean-squared error (MSE) loss while comparing the performance with \cite{adler2022task}. The classification accuracy of the bilevel approach (with pre-trained $T_{\phi}$ and jointly learned $T_{\phi}$ and $g_{\theta}$) are reported in Table \ref{tab_main_table_results}. To facilitate a visual comparison, we show the reconstructed images corresponding to the proposed methods and the competing techniques in Figure \ref{fig:mnist_predictions}.\\
+The raw measurement and the naive pseudo-inverse reconstructions exhibit severe Gaussian blur, making the digit edges nearly indistinguishable from the background. The sequential and end-to-end training approaches of \cite{adler2022task} successfully sharpen the digit but introduce grid-like artifacts (more pronounced in the end-to-end approach). We report the performance of joint training of \cite{adler2022task} corresponding to the best $c$, found using a grid-search. The joint loss in \eqref{eq_joint_loss_adler} balances reconstruction and task errors, resulting in a cleaner image, although training requires triplets $(x,y,t)$. The bilevel approach with a fixed, pre-trained $T_\phi$) leads to a slightly distorted image since the task network is frozen, and the regularizer focuses entirely on exaggerating features strictly necessary for classification, while sacrificing natural visual fidelity. Joint learning of $T_\phi$ and $g_\theta$ yields the sharpest and the most natural reconstruction that is visually closest to the ground truth, while performing on par with the joint learning strategy of \cite{adler2022task} using significantly fewer learnable parameters in comparison.
+
+% \subsubsection{Problem Formulation}
+
+% Given a forward operator $A$ (Gaussian blur with additive Gaussian noise), the goal is to learn regularization parameters $\theta$ such that images reconstructed from degraded measurements $y = Ax + \eta$ are optimally suited for a downstream classification task on the MNIST Dataset.
+
+% We study two training strategies:
+% \subsubsection{Network Architectures}
+% \label{subsec:architectures}
+
+% Our bilevel learning framework consists of the following neural network modules: a task network to perform the downstream classification.
+
+% \subsubsection{Task Network}
+% The task module, denoted as $T_{\phi}: X \rightarrow D$, acts as the downstream classifier predicting the label $d \in D$ from the reconstructed image $x$. 
+
+% For the MNIST classification task, we utilize a standard Convolutional Neural Network (CNN) comprising:
+% \begin{itemize}
+%     \item \textbf{Feature Extractor:} A sequence of blocks containing a $3 \times 3$ convolution, Batch Normalization, ReLU activation, and a $2 \times 2$ Max Pooling layer. The channel dimensions progressively increase (e.g., 32, 64, 128) to extract hierarchical abstract features.
+%     \item \textbf{Classifier:} The resulting spatial feature maps are flattened and passed through a fully connected linear layer to output the final logits for the $10$ digit classes. The input dimension to the linear layer is computed dynamically based on the input image resolution and the number of pooling operations.
+% \end{itemize}
+
+% \begin{table}[htbp]
+% \centering
+% \caption{Hyperparameters for MNIST experiments. Shared parameters have the same value across both setups.}
+% \label{tab:hyperparams_mnist}
+% \renewcommand{\arraystretch}{1.2}
+% \begin{tabular}{@{}llcc@{}}
+% \toprule
+% \textbf{Category} & \textbf{Hyperparameter} \\
+% \midrule
+% \textbf{Dataset}
+%     & Train/Val/Test split  & \multicolumn{2}{c}{50{,}000 / 10{,}000 / 10{,}000} \\
+%     & Image size            & \multicolumn{2}{c}{$28 \times 28$} \\
+%     & Batch size            & \multicolumn{2}{c}{4096} \\
+% \midrule
+% \textbf{Physics}
+%     & Blur $\sigma$         & \multicolumn{2}{c}{3} \\
+%     & Noise $\sigma$        & \multicolumn{2}{c}{0.01} \\
+% \midrule
+% % \textbf{Regularizer}
+% %     & Type                  & Total Variation & Fields of Experts \\
+% %     & \# learnable params   & 2 & 136 \\
+% % \midrule
+% \textbf{Outer Opt.}
+%     & Classifier LR ($\eta_\phi$) & \multicolumn{2}{c}{$1 \times 10^{-3}$} \\
+%     & Theta LR ($\eta_\theta$)  & \multicolumn{2}{c}{0.05} \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% % ===========================================================================
+%  SUBSECTION 2: Medical Datase
+% ===========================================================================
+\subsection{Image segmentation in CT and MRI}
+\label{subsec:medical_setup}
+To demonstrate the applicability of our approach to practical clinical inverse problems, we consider the task of semantic segmentation of the spleen from abdominal CT images and the left atrium from cardiac MR images (Task-9 and Task-2, respectively, in the MSD challenge \cite{Antonelli2022}). The CT forward operator is simulated using a sparse-view geometry with only 60 projection angles, followed by adding Gaussian noise with $\sigma_w=0.5$ to the clean sinogram. The MRI forward operator applies a $12\times$ undersampling in the $k$-space, followed by Gaussian noise corruption with $\sigma_w=3$. For both problems, we use an $85\%/15\%$ split of the dataset for training and inference. The CT and MR images are of size $128\times 128$, and a batch size of $64$ images is used for training. The learning rates are taken as $\eta_{\phi}=\eta_{\theta}=0.05$ for both modalities. The task loss $\mathcal{L}_{\text{task}}$ combines binary cross-entropy and the soft-dice loss with weights 0.8 and 0.2, respectively. A quantitative performance evaluation (in terms of the dice score) is presented in Table \ref{tab:comprehensive_results}, while a visual comparison of the reconstructed images is shown in Figures \ref{fig:reconstruction_and_masks_ct} and \ref{fig:reconstruction_and_masks_mri} for CT and MRI, respectively.\\
+We observe that the baseline pseudo-inverse reconstructions $A^\dagger y$ suffer heavily from sparse-view streak artifacts in CT and aliasing artifacts in MRI due to undersampling in the frequency domain, providing a poor foundation for segmentation. Both sequential and end-to-end approaches remove major artifacts and yield reasonably accurate segmentation masks. However, the images remain artifact-ridden, indicating suboptimal tuning of the reconstruction operator. For the proposed bilevel approach with a pre-trained task operator on $(x,t)$ pairs, the reconstruction mostly blurs or abstracts away the background anatomy irrelevant to the task to enhance the contrast of the region-of-interest. While this drops the absolute Dice score due to domain shift with the fixed network, it qualitatively illustrates how the regularizer gets steered by the task loss. By learning the regularizer and task network simultaneously, the framework restores the natural anatomical texture and structure of the organs, which helps achieve highly accurate segmentation masks.
+
+% \begin{itemize}
+%     \item \textbf{Measurement ($y$) \& $A^\dagger y$}: The initial physics-based reconstructions suffer heavily from sparse-view streak artifacts (CT) and undersampling aliasing (MRI), providing a very poor foundation for segmentation.
+%     \item \textbf{Sequential \& End-to-End}: Both approaches remove major artifacts and yield acceptable segmentation masks. However, the images remain slightly blurry, indicating suboptimal regularizer tuning.
+%     \item \textbf{Bilevel Learning (BL - fixed $T_\phi$)}: The reconstruction mostly blurs or abstracts away the background anatomy (which is irrelevant to the task) to enhance the contrast of the Region of Interest. While this drops the absolute Dice score due to domain shift with the fixed network, it visually proves the regularizer is entirely steered by the task loss.
+%     \item \textbf{Bilevel Learning (BL - joint $T_\phi$ and $R_\theta$)}: By learning the regularizer and task network simultaneously, the framework not only restores the natural anatomical texture and structure of the organs but also achieves highly accurate, tight segmentation masks.
+% \end{itemize}
+
+% we evaluated the framework on the Medical Segmentation Decathlon (MSD) Task09\_Spleen dataset. 
+
+% \textbf{Dataset and Physics Model:} The CT images were utilized, partitioned into 70\% training, 15\% validation, and 15\% testing splits. All images were resized to $128 \times 128$ pixels and normalized by clipping Hounsfield units to a range of $[-150, 250]$ followed by scaling. The forward physics model simulated a sparse-view CT Radon Transform with an acceleration factor of 6x. To rigorously test the regularizer's robustness, significant Gaussian noise was added to the simulated sinograms. 
+
+% \textbf{Optimization and Loss Function:} Because this is a segmentation task, the U-Net was trained using a composite loss function combining Binary Cross-Entropy (BCE) and Soft Dice Loss (weighted 0.8 and 0.2, respectively). 
+% \subsection{Key Insights from Reconstructed Images}
+
+% \subsubsection{MNIST Dataset (Figure 1: Classification under Blur)}
+% \begin{itemize}
+%     \item \textbf{Measurement ($y$) \& $A^\dagger y$}: The raw measurements and naive pseudoinverse reconstructions exhibit severe Gaussian blur, making digit borders indistinguishable. 
+%     \item \textbf{Sequential \& End-to-End}: These methods successfully sharpen the digit but introduce noticeable grid-like or ringing artifacts (especially visible in the end-to-end approach).
+%     \item \textbf{Joint ($c=0.5$)}: Balances reconstruction and task loss, resulting in a cleaner image, though some noise remains.
+%     \item \textbf{Bilevel Learning (BL - fixed $T_\phi$)}: The image becomes slightly distorted. Because the task network is frozen, the regularizer focuses entirely on exaggerating features strictly necessary for classification, sacrificing natural visual fidelity.
+%     \item \textbf{Bilevel Learning (BL - joint $T_\phi$ and $R_\theta$)}: Yields the sharpest, most natural reconstruction that is visually closest to the ground truth, proving that jointly updating the task network and regularizer creates optimal synergy.
+% \end{itemize}
+
+% \subsubsection{Medical Datasets (Figures 2 \& 3: CT and MRI Segmentation)}
+
+\subsection{
+ICNN-Based Learned Convex Regularizer}
+\label{subsec:exp_icnn}
+
+In this experiment, we replace the hand-crafted regularizer used in previous experiments with a \emph{learned} convex regularizer based on Input-Convex Neural Networks (ICNNs). The regularizer is pre-trained on the medical dataset via adversarial convex regularizer (ACR) training, then integrated into the HOAG bilevel framework with frozen network weights.
+
+\subsubsection{Learned Convex Regularizer}
+
+The regularizer consists of three convex components:
+\begin{enumerate}
+    \item \textbf{ICNN:} An Input-Convex Neural Network with 5 layers, 32 filters, and $3\times3$ kernels. Input-convexity is ensured by constraining the weights on the residual path ($\mathbf{W}^{(z)}$ layers) to be non-negative and using leaky ReLU activations ($\alpha = 0.2$). The output is a scalar energy per image via global average pooling.
+    \item \textbf{SFB:} A Sparsifying Filter Bank with 10 learned convolutional kernels. It computes $\sum_{k=1}^{10} \|\mathbf{c}_k * x\|_1$ weighted by a learnable penalty parameter, which is convex since it is a sum of absolute values of linear functions.
+    \item \textbf{L2net:} A learnable $\ell_2$ penalty term $\mu \|x\|_2^2$ with learnable weight $\mu$.
+\end{enumerate}
+
+The combined regularizer is:
+\begin{equation}
+    g_{\boldsymbol{\theta}}(x) = e^{\theta_1} \cdot \text{ICNN}(\tilde{x}) + e^{\theta_2} \cdot \text{SFB}(\tilde{x}) + e^{\theta_3} \cdot \text{L2net}(\tilde{x}),
+    \label{eq:icnn_reg}
+\end{equation}
+where $\tilde{w} = \text{norm}(w)$ denotes the CT-normalized reconstruction (clamped to $[-150, 250]$ HU and scaled to $[0, 1]$), and $\boldsymbol{\theta} = [\theta_1, \theta_2, \theta_3] = [\log \lambda_{\text{icnn}}, \log \lambda_{\text{sfb}}, \log \lambda_{\ell_2}]$ are three scalar mixing weights optimized by HOAG.
+
+\subsubsection{Pre-Training via ACR}
+
+The regularizer networks are pre-trained using adversarial convex regularizer (ACR) training. Given clean images $x$ and their noisy filtered backprojections $\hat{x} = A^\dagger y$, the training loss is:
+\begin{equation}
+    \mathcal{L}_{\text{ACR}} = \underbrace{\left[ g(x) - g(\hat{x}) \right]}_{\text{critic loss}} + \lambda_{\text{gp}} \cdot \underbrace{\text{GP}(\text{ICNN}, x, \hat{x})}_{\text{gradient penalty}},
+    \label{eq:acr_loss}
+\end{equation}
+where the critic loss encourages the regularizer to assign lower energy to clean images and higher energy to corrupted images, and the gradient penalty enforces Lipschitz regularity on the ICNN. After each parameter update, the non-negative weight constraint is enforced via clamping to preserve input-convexity.
+
+% \subsubsection{Bilevel HOAG Integration}
+
+% The HOAG bilevel formulation follows the same structure as the previous experiments:
+% \begin{align}
+%     \min_{\boldsymbol{\theta}} \quad & g(\boldsymbol{\theta}) = \mathcal{L}_{\text{seg}}\!\left(\text{UNet}(w^*(\boldsymbol{\theta})),\, m\right) \label{eq:icnn_outer} \\
+%     \text{s.t.} \quad & w^*(\boldsymbol{\theta}) = \arg\min_{w} \; \underbrace{\|y - A(w)\|^2}_{\text{data fidelity}} + \underbrace{R_{\boldsymbol{\theta}}(w)}_{\text{ICNN regularizer}} \label{eq:icnn_inner}
+% \end{align}
+
+% A key difference from the TV and FoE experiments is how the hypergradient is computed. Since the physics operator (Radon transform) uses \texttt{grid\_sample} internally, which does not support second-order automatic differentiation, the Hessian-vector product (HVP) $H \cdot v$ where $H = \nabla^2_{ww} h(w^*, \boldsymbol{\theta})$ is decomposed as:
+% \begin{equation}
+%     H \cdot v = \underbrace{2 A^\top A v}_{\text{analytical (forward + adjoint)}} + \underbrace{\nabla^2_{ww} R_{\boldsymbol{\theta}}(w^*) \cdot v}_{\text{autograd through ICNN}}.
+%     \label{eq:hvp_split}
+% \end{equation}
+% The first term is computed using only the forward operator $A$ and its adjoint $A^\top$ (no second-order derivatives required). The second term uses double backpropagation through the ICNN only, which is fully differentiable. Similarly, the cross-derivative $\nabla^2_{w\boldsymbol{\theta}} h$ only involves the regularizer since the data fidelity term does not depend on $\boldsymbol{\theta}$.
+
+\subsubsection{Experimental Setup}
+
+The experiment is conducted on the Task09\_Spleen dataset from the Medical Segmentation Decathlon, using the same sparse-view CT setup: $6\times$ acceleration, Gaussian noise $\sigma = 0.5$, and $128 \times 128$ image resolution. The ICNN regularizer is pre-trained for 20 epochs using ACR training with learning rate $2 \times 10^{-5}$ and gradient penalty weight $\lambda_{\text{gp}} = 5.0$. The bilevel optimization runs for 40 outer epochs.
+
+\subsubsection{Results}
+
+In the first approach, which optimizes only the three mixing weights $\boldsymbol{\theta}$ via HOAG while keeping the UNet fixed, recovers the Dice score to \texttt{0.7330}, demonstrating that the learned ICNN regularizer can effectively suppress artifacts when its component weights are properly tuned through bilevel optimization. The second approach further improves the score to \texttt{0.8969} by jointly optimizing $\boldsymbol{\theta}$ and the UNet weights, allowing the segmentation network to co-adapt with the reconstruction quality.
+
+
+
